@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyBridge - Welcome</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #07170d;
+            color: #f3f4f6;
+        }
+
+        .font-serif-title {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Felt texture background gradient */
+        .hero-bg {
+            background: radial-gradient(circle at 50% 30%, #1b4d2e 0%, #0d2b19 60%, #05120a 100%);
+        }
+
+        /* Subtle ambient card floating animation */
+        @keyframes float-slow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(3deg); }
+        }
+
+        @keyframes float-reverse {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-14px) rotate(-3deg); }
+        }
+
+        .animate-float-1 { animation: float-slow 6s ease-in-out infinite; }
+        .animate-float-2 { animation: float-reverse 7s ease-in-out infinite 1s; }
+
+        /* Card glow effect */
+        .card-glow {
+            box-shadow: 0 0 35px rgba(251, 191, 36, 0.25);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between hero-bg relative overflow-x-hidden">
+
+    <!-- Ambient background card decorations -->
+    <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-10">
+        <div class="absolute top-12 left-10 text-9xl text-amber-400 animate-float-1">♠</div>
+        <div class="absolute top-1/3 right-12 text-9xl text-red-500 animate-float-2">♥</div>
+        <div class="absolute bottom-16 left-1/4 text-9xl text-amber-400 animate-float-2">♣</div>
+        <div class="absolute bottom-20 right-1/4 text-9xl text-red-500 animate-float-1">♦</div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="w-full max-w-7xl mx-auto px-6 py-6 flex justify-between items-center z-10">
+        <div class="flex items-center space-x-3">
+            <div class="bg-amber-500 text-emerald-950 w-10 h-10 rounded-xl flex items-center justify-center font-black text-2xl shadow-lg border border-amber-300">
+                ♠
+            </div>
+            <span class="font-serif-title font-bold text-xl text-amber-400 tracking-wider">Bridge Project</span>
+        </div>
+        <a href="https://github.com" target="_blank" class="text-emerald-300 hover:text-white transition text-sm flex items-center gap-2 bg-emerald-950/60 px-4 py-2 rounded-full border border-emerald-800/80">
+            <i class="fa-brands fa-github"></i>
+            <span>GitHub Repo</span>
+        </a>
+    </header>
+
+    <!-- Main Hero Section -->
+    <main class="flex-1 flex flex-col items-center justify-center text-center px-4 py-12 z-10 max-w-4xl mx-auto">
+        
+        <!-- Welcome Badge -->
+        <div class="inline-flex items-center gap-2 bg-emerald-900/60 border border-emerald-600/50 text-emerald-300 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6 shadow-md backdrop-blur-md">
+            <i class="fa-solid fa-cards text-amber-400"></i> Standard Contract Bridge Game
+        </div>
+
+        <!-- Main Title -->
+        <h1 class="text-4xl sm:text-6xl font-black font-serif-title text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 mb-6 leading-tight drop-shadow-md">
+            Welcome to EasyBridge
+        </h1>
+
+        <!-- CTA Redirect Button -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-sm">
+            <a href="SinglePlayer.html" class="w-full group bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-emerald-950 font-black text-lg py-4 px-8 rounded-2xl shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 flex items-center justify-center gap-3 card-glow">
+                <i class="fa-solid fa-play text-xl transition-transform group-hover:translate-x-1"></i>
+                <span>Play Single Player</span>
+            </a>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full text-center py-6 text-xs text-emerald-400/60 border-t border-emerald-900/60 z-10">
+        <p>Bridge Project &copy; Standard Contract Bridge Card Game</p>
+    </footer>
+
+</body>
+</html>

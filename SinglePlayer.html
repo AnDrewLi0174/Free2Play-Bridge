@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bridge Project - Online Contract Bridge</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b1d13;
+            color: #f3f4f6;
+            user-select: none;
+        }
+
+        .font-serif-title {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Felt table background texture simulation */
+        .felt-table {
+            background: radial-gradient(circle at center, #1b4d2e 0%, #0d2b19 75%, #07170d 100%);
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        /* Card styles */
+        .card {
+            transition: transform 0.25s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            perspective: 1000px;
+            cursor: pointer;
+        }
+
+        .card:hover:not(.disabled) {
+            transform: translateY(-12px) scale(1.05);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.6);
+            z-index: 40 !important;
+        }
+
+        .card.disabled {
+            cursor: not-allowed;
+            opacity: 0.85;
+            filter: brightness(0.85);
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e1b4b 100%);
+            border: 2px solid #38bdf8;
+            background-image: radial-gradient(#38bdf8 1px, transparent 1px);
+            background-size: 8px 8px;
+        }
+
+        /* Suit colors */
+        .suit-spades, .suit-clubs { color: #111827; }
+        .suit-hearts, .suit-diamonds { color: #dc2626; }
+
+        /* Custom Scrollbar for auction log */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Glow effects */
+        .active-turn-indicator {
+            box-shadow: 0 0 15px 3px rgba(250, 204, 21, 0.6);
+            animation: pulse-border 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 8px 2px rgba(250, 204, 21, 0.4); }
+            100% { box-shadow: 0 0 20px 5px rgba(250, 204, 21, 0.8); }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col justify-between">
+
+    <!-- Top Navigation / Header -->
+    <header class="bg-emerald-950/80 border-b border-emerald-700/50 px-4 py-2 flex justify-between items-center z-20 backdrop-blur-md">
+        <div class="flex items-center space-x-3">
+            <div class="bg-amber-500 text-emerald-950 p-2 rounded-lg font-black text-xl shadow-md">
+                <i class="fa-solid me-1 fa-cards"></i>♠
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide font-serif-title text-amber-400">Bridge Project</h1>
+                <p class="text-xs text-emerald-300">Standard Contract Bridge vs AI</p>
+            </div>
+        </div>
+
+        <!-- Scoreboard Summary Header -->
+        <div class="hidden md:flex items-center space-x-6 bg-emerald-900/60 border border-emerald-600/40 px-4 py-1.5 rounded-xl text-sm">
+            <div class="text-center">
+                <span class="block text-[10px] uppercase tracking-wider text-emerald-400 font-bold">Dealer</span>
+                <span id="header-dealer" class="font-semibold text-amber-300">North</span>
+            </div>
+            <div class="h-6 w-px bg-emerald-700/60"></div>
+            <div class="text-center">
+                <span class="block text-[10px] uppercase tracking-wider text-emerald-400 font-bold">Vulnerability</span>
+                <span id="header-vul" class="font-semibold text-emerald-200">None</span>
+            </div>
+            <div class="h-6 w-px bg-emerald-700/60"></div>
+            <div class="text-center">
+                <span class="block text-[10px] uppercase tracking-wider text-emerald-400 font-bold">Contract</span>
+                <span id="header-contract" class="font-bold text-amber-300">--</span>
+            </div>
+            <div class="h-6 w-px bg-emerald-700/60"></div>
+            <div class="text-center">
+                <span class="block text-[10px] uppercase tracking-wider text-emerald-400 font-bold">Tricks (N-S : E-W)</span>
+                <span id="header-tricks" class="font-bold text-white">0 : 0</span>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center space-x-2">
+            <button id="btn-toggle-bidding" onclick="toggleBiddingModal()" class="bg-indigo-700/80 hover:bg-indigo-600 text-indigo-100 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-indigo-500/50 hidden">
+                <i class="fa-solid fa-gavel"></i> <span id="bidding-toggle-label">Show Bidding Box</span>
+            </button>
+            <button id="btn-hint" onclick="getHint()" class="bg-amber-600/80 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-lightbulb"></i> <span class="hidden sm:inline">Hint</span>
+            </button>
+            <button id="btn-speed" onclick="toggleSpeed()" class="bg-emerald-800/80 hover:bg-emerald-700 text-emerald-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-emerald-600/50">
+                <i class="fa-solid fa-gauge-high"></i> <span id="speed-label">Speed: Normal</span>
+            </button>
+            <button onclick="startNewDeal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-md flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-rotate-right"></i> <span>New Deal</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Felt Table Layout -->
+    <main class="relative flex-1 felt-table flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+
+        <!-- Status & Phase Banner -->
+        <div id="game-status-banner" class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/60 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm px-4 py-1.5 rounded-full backdrop-blur-md z-10 font-medium text-center shadow-lg transition-all">
+            Initializing Game...
+        </div>
+
+        <!-- PLAYERS & CARDS DISPLAY AREA -->
+        <div class="relative w-full max-w-5xl h-full max-h-[700px] flex flex-col justify-between items-center py-2">
+
+            <!-- NORTH (Partner) -->
+            <div class="flex flex-col items-center z-10">
+                <div id="player-north-box" class="bg-emerald-950/80 border border-emerald-700/60 px-4 py-1 rounded-full flex items-center space-x-2 mb-1 shadow-md">
+                    <span id="badge-north" class="text-xs font-bold text-amber-400">NORTH (Partner)</span>
+                    <span id="tricks-north" class="bg-emerald-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-300">0 Tricks</span>
+                </div>
+                <!-- Hand Cards North -->
+                <div id="hand-north" class="flex -space-x-8 sm:-space-x-10 h-20 sm:h-24 min-w-[200px] justify-center items-center">
+                    <!-- Dynamic Cards -->
+                </div>
+            </div>
+
+            <!-- MIDDLE ROW (WEST, PLAY AREA, EAST) -->
+            <div class="w-full flex justify-between items-center flex-1 my-1">
+
+                <!-- WEST (Opponent) -->
+                <div class="flex flex-col items-center z-10 w-24 sm:w-32">
+                    <div id="player-west-box" class="bg-emerald-950/80 border border-emerald-700/60 px-3 py-1 rounded-full flex flex-col items-center mb-2 shadow-md">
+                        <span id="badge-west" class="text-xs font-bold text-red-400">WEST</span>
+                        <span id="tricks-west" class="bg-emerald-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-300">0 Tricks</span>
+                    </div>
+                    <!-- Hand Cards West -->
+                    <div id="hand-west" class="flex flex-col -space-y-16 w-16 sm:w-20 items-center justify-center">
+                        <!-- Dynamic Cards -->
+                    </div>
+                </div>
+
+                <!-- CENTRAL TRICK PLAYING AREA -->
+                <div class="relative flex-1 max-w-md h-52 sm:h-64 rounded-3xl border-2 border-emerald-600/20 bg-emerald-950/20 flex items-center justify-center p-4">
+                    
+                    <!-- Played Cards in Trick -->
+                    <div id="trick-north" class="absolute top-2 left-1/2 -translate-x-1/2 w-14 h-20 sm:w-16 sm:h-24 transition-all duration-300"></div>
+                    <div id="trick-south" class="absolute bottom-2 left-1/2 -translate-x-1/2 w-14 h-20 sm:w-16 sm:h-24 transition-all duration-300"></div>
+                    <div id="trick-west" class="absolute left-4 top-1/2 -translate-y-1/2 w-14 h-20 sm:w-16 sm:h-24 transition-all duration-300"></div>
+                    <div id="trick-east" class="absolute right-4 top-1/2 -translate-y-1/2 w-14 h-20 sm:w-16 sm:h-24 transition-all duration-300"></div>
+
+                    <!-- Center Info Indicator -->
+                    <div id="center-info" class="text-center text-emerald-300/60 font-serif-title text-sm pointer-events-none">
+                        Bridge Felt
+                    </div>
+                </div>
+
+                <!-- EAST (Opponent) -->
+                <div class="flex flex-col items-center z-10 w-24 sm:w-32">
+                    <div id="player-east-box" class="bg-emerald-950/80 border border-emerald-700/60 px-3 py-1 rounded-full flex flex-col items-center mb-2 shadow-md">
+                        <span id="badge-east" class="text-xs font-bold text-red-400">EAST</span>
+                        <span id="tricks-east" class="bg-emerald-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-300">0 Tricks</span>
+                    </div>
+                    <!-- Hand Cards East -->
+                    <div id="hand-east" class="flex flex-col -space-y-16 w-16 sm:w-20 items-center justify-center">
+                        <!-- Dynamic Cards -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- SOUTH (User) -->
+            <div class="flex flex-col items-center z-10">
+                <!-- Hand Cards South -->
+                <div id="hand-south" class="flex -space-x-6 sm:-space-x-8 h-24 sm:h-28 min-w-[280px] justify-center items-center mb-2">
+                    <!-- Dynamic Cards -->
+                </div>
+                <div id="player-south-box" class="bg-emerald-950/80 border border-emerald-700/60 px-4 py-1 rounded-full flex items-center space-x-2 shadow-md">
+                    <span id="badge-south" class="text-xs font-bold text-amber-400">SOUTH (You)</span>
+                    <span id="tricks-south" class="bg-emerald-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-300">0 Tricks</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- BIDDING BOX OVERLAY (Auction Phase) -->
+        <div id="bidding-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 flex items-center justify-center p-4">
+            <div class="bg-emerald-950 border-2 border-emerald-600/60 rounded-2xl p-4 sm:p-6 w-full max-w-2xl shadow-2xl flex flex-col md:flex-row gap-6 relative">
+                
+                <!-- Close / Minimize Bidding Box Button -->
+                <button onclick="toggleBiddingModal()" class="absolute top-3 right-3 text-emerald-400 hover:text-white bg-emerald-900/80 hover:bg-emerald-800 border border-emerald-700/60 w-8 h-8 rounded-full flex items-center justify-center transition shadow-md" title="Minimize Bidding Box to inspect cards">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+
+                <!-- Left: Bidding Controls -->
+                <div class="flex-1 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-3 pr-8">
+                            <h2 class="text-lg font-bold text-amber-400 font-serif-title flex items-center gap-2">
+                                <i class="fa-solid fa-gavel"></i> Bidding Box (Auction)
+                            </h2>
+                            <span id="bidding-turn-indicator" class="text-xs text-emerald-300 bg-emerald-900/80 px-2.5 py-1 rounded-full border border-emerald-700">
+                                Current Bidder: <strong class="text-white" id="current-bidder-text">South</strong>
+                            </span>
+                        </div>
+                        <p class="text-xs text-emerald-200/80 mb-4">Select level and suit to place a higher bid than the previous call.</p>
+
+                        <!-- Level Selectors (1 to 7) -->
+                        <div class="mb-3">
+                            <label class="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-1">1. Select Level</label>
+                            <div class="grid grid-cols-7 gap-1.5" id="level-buttons">
+                                <!-- Level buttons generated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Suit Selectors -->
+                        <div class="mb-4">
+                            <label class="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-1">2. Select Suit / No Trump</label>
+                            <div class="grid grid-cols-5 gap-1.5" id="suit-buttons">
+                                <button onclick="selectSuit('♣')" class="suit-btn bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-white font-bold py-2 rounded-lg text-lg flex items-center justify-center hover:scale-105 transition">♣</button>
+                                <button onclick="selectSuit('♦')" class="suit-btn bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-red-400 font-bold py-2 rounded-lg text-lg flex items-center justify-center hover:scale-105 transition">♦</button>
+                                <button onclick="selectSuit('♥')" class="suit-btn bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-red-400 font-bold py-2 rounded-lg text-lg flex items-center justify-center hover:scale-105 transition">♥</button>
+                                <button onclick="selectSuit('♠')" class="suit-btn bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-white font-bold py-2 rounded-lg text-lg flex items-center justify-center hover:scale-105 transition">♠</button>
+                                <button onclick="selectSuit('NT')" class="suit-btn bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-amber-300 font-bold py-2 rounded-lg text-sm flex items-center justify-center hover:scale-105 transition">NT</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Calls: Pass, Double, Redouble, Make Bid -->
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-3 gap-2">
+                            <button id="btn-pass" onclick="makeCall('Pass')" class="bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold py-2 rounded-xl text-sm transition">Pass</button>
+                            <button id="btn-double" onclick="makeCall('Double')" class="bg-red-900/80 hover:bg-red-800 text-red-200 font-bold py-2 rounded-xl text-sm transition disabled:opacity-40" disabled>Double</button>
+                            <button id="btn-redouble" onclick="makeCall('Redouble')" class="bg-blue-900/80 hover:bg-blue-800 text-blue-200 font-bold py-2 rounded-xl text-sm transition disabled:opacity-40" disabled>Redouble</button>
+                        </div>
+                        <button id="btn-submit-bid" onclick="submitBid()" class="w-full bg-amber-500 hover:bg-amber-400 text-emerald-950 font-black py-2.5 rounded-xl text-sm shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            Make Call: <span id="selected-bid-preview">Select Level & Suit</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right: Auction History Log -->
+                <div class="w-full md:w-56 bg-emerald-900/40 border border-emerald-700/50 rounded-xl p-3 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-xs font-bold text-emerald-300 uppercase tracking-wider mb-2 border-b border-emerald-700/50 pb-1">Auction History</h3>
+                        <div class="grid grid-cols-4 text-center text-[11px] font-bold text-amber-400/90 mb-1">
+                            <span>N</span><span>E</span><span>S</span><span>W</span>
+                        </div>
+                        <div id="auction-table" class="grid grid-cols-4 text-center text-xs gap-y-1 font-mono max-h-48 overflow-y-auto custom-scroll pr-1">
+                            <!-- Bids inserted dynamically -->
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-emerald-800/60 text-[11px] text-emerald-300/80">
+                        <p id="auction-status-hint">Auction in progress...</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- SUMMARY & SCORING MODAL -->
+        <div id="summary-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-40 flex items-center justify-center p-4 hidden">
+            <div class="bg-emerald-950 border-2 border-amber-500/60 rounded-2xl p-6 max-w-md w-full text-center shadow-2xl relative">
+                <div class="w-16 h-16 bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                    <i class="fa-solid fa-trophy" id="summary-icon"></i>
+                </div>
+                <h2 id="summary-title" class="text-2xl font-bold font-serif-title text-amber-400 mb-1">Hand Completed</h2>
+                <p id="summary-contract-desc" class="text-sm text-emerald-200 mb-4">Contract: 4♥ by South</p>
+
+                <div class="bg-emerald-900/50 rounded-xl p-4 mb-5 border border-emerald-700/50 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-emerald-300">Declarer Side (N-S):</span>
+                        <span id="summary-ns-tricks" class="font-bold text-white">10 Tricks</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-emerald-300">Defenders Side (E-W):</span>
+                        <span id="summary-ew-tricks" class="font-bold text-white">3 Tricks</span>
+                    </div>
+                    <div class="h-px bg-emerald-700/50 my-1"></div>
+                    <div class="flex justify-between text-base">
+                        <span class="text-amber-300 font-bold">Result:</span>
+                        <span id="summary-result-text" class="font-black text-amber-400">MADE (+1 Overtrick)</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-emerald-300/80">
+                        <span>Bridge Score:</span>
+                        <span id="summary-score-val" class="font-mono font-bold text-white">+420 pts</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="startNewDeal()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-emerald-950 font-black py-3 rounded-xl shadow-lg transition">
+                        Next Deal
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer Help & Info -->
+    <footer class="bg-emerald-950/90 border-t border-emerald-800/50 px-4 py-1.5 text-center text-xs text-emerald-400/80 z-20 flex justify-between items-center">
+        <span><i class="fa-solid fa-shield-halved me-1"></i> Strict Suit Following Rules Active</span>
+        <span>Standard Contract Bridge (13 Tricks)</span>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /* ==========================================================================
+           1. CONSTANTS, SUITS & SOUND SYNTHESIS
+           ========================================================================== */
+        const SUITS = ['♣', '♦', '♥', '♠'];
+        const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        const PLAYERS = ['North', 'East', 'South', 'West'];
+        const SUIT_ORDER = { '♣': 1, '♦': 2, '♥': 3, '♠': 4, 'NT': 5 };
+
+        // Sound Synthesis using Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'card') {
+                // Short crisp card play noise
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'bid') {
+                // High cheerful chime
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.06); // E5
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                osc.start(now);
+                osc.stop(now + 0.18);
+            } else if (type === 'win') {
+                // Fanfare chord sound
+                [523.25, 659.25, 783.99].forEach((freq, idx) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.frequency.setValueAtTime(freq, now + idx * 0.05);
+                    g.gain.setValueAtTime(0.2, now + idx * 0.05);
+                    g.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    o.start(now + idx * 0.05);
+                    o.stop(now + 0.4);
+                });
+            }
+        }
+
+        /* ==========================================================================
+           2. GAME STATE MANAGEMENT
+           ========================================================================== */
+        let state = {
+            dealerIdx: -1,         // Will be set to 0 (North) on first deal
+            currentTurnIdx: 0,
+            hands: { North: [], East: [], South: [], West: [] },
+            phase: 'BIDDING',      // 'BIDDING', 'PLAYING', 'FINISHED'
+            auction: [],           // Array of { player, call }
+            passesInRow: 0,
+            contract: null,        // { level, suit, declarer, doubled, redoubled }
+            dummy: null,
+            declarer: null,
+            
+            // Trick Play phase
+            currentTrick: [],      // Array of { player, card }
+            leadSuit: null,
+            tricksWon: { 'N-S': 0, 'E-W': 0 },
+            trickHistory: [],
+            aiSpeed: 800           // Speed in milliseconds
+        };
+
+        // Selection state inside Bidding Modal
+        let selectedLevel = null;
+        let selectedSuit = null;
+
+        /* ==========================================================================
+           3. GAME INITIALIZATION & DEALING
+           ========================================================================== */
+        function initGame() {
+            createBiddingUI();
+            startNewDeal();
+        }
+
+        function startNewDeal() {
+            // Reset state
+            state.phase = 'BIDDING';
+            state.auction = [];
+            state.passesInRow = 0;
+            state.contract = null;
+            state.declarer = null;
+            state.dummy = null;
+            state.currentTrick = [];
+            state.leadSuit = null;
+            state.tricksWon = { 'N-S': 0, 'E-W': 0 };
+            state.trickHistory = [];
+
+            // Dealer rotates clockwise: Starts at North (0) on 1st round, then East (1), South (2), West (3)
+            if (state.dealerIdx === -1) {
+                state.dealerIdx = 0; // Fixed starting dealer for 1st hand: North
+            } else {
+                state.dealerIdx = (state.dealerIdx + 1) % 4;
+            }
+            
+            // The dealer strictly starts the bidding auction
+            state.currentTurnIdx = state.dealerIdx;
+
+            // Generate full 52 card deck
+            const deck = [];
+            SUITS.forEach(suit => {
+                RANKS.forEach((rank, idx) => {
+                    deck.push({ suit, rank, value: idx + 2 });
+                });
+            });
+
+            // Fisher-Yates Shuffle
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            // Deal 13 cards to each player
+            PLAYERS.forEach((player, i) => {
+                state.hands[player] = deck.slice(i * 13, (i + 1) * 13);
+                sortHand(state.hands[player]);
+            });
+
+            // Hide summary modal, show bidding modal & toggle button
+            document.getElementById('summary-modal').classList.add('hidden');
+            document.getElementById('bidding-modal').classList.remove('hidden');
+            const toggleBtn = document.getElementById('btn-toggle-bidding');
+            toggleBtn.classList.remove('hidden');
+            document.getElementById('bidding-toggle-label').innerText = 'Hide Bidding Box';
+
+            updateUI();
+            updateAuctionLog();
+            processTurn();
+        }
+
+        // Sort hand cards by suit and rank for clear layout
+        function sortHand(hand) {
+            hand.sort((a, b) => {
+                if (SUIT_ORDER[a.suit] !== SUIT_ORDER[b.suit]) {
+                    return SUIT_ORDER[b.suit] - SUIT_ORDER[a.suit];
+                }
+                return b.value - a.value;
+            });
+        }
+
+        /* ==========================================================================
+           4. BIDDING / AUCTION LOGIC
+           ========================================================================== */
+        function createBiddingUI() {
+            const levelContainer = document.getElementById('level-buttons');
+            levelContainer.innerHTML = '';
+            for (let l = 1; l <= 7; l++) {
+                const btn = document.createElement('button');
+                btn.className = `level-btn bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 font-bold py-2 rounded-lg text-sm transition hover:scale-105`;
+                btn.innerText = l;
+                btn.onclick = () => selectLevel(l);
+                levelContainer.appendChild(btn);
+            }
+        }
+
+        function selectLevel(lvl) {
+            selectedLevel = lvl;
+            updateBiddingSelectionVisuals();
+        }
+
+        function selectSuit(s) {
+            selectedSuit = s;
+            updateBiddingSelectionVisuals();
+        }
+
+        function updateBiddingSelectionVisuals() {
+            // Update Level buttons style
+            document.querySelectorAll('.level-btn').forEach((btn, idx) => {
+                if (idx + 1 === selectedLevel) {
+                    btn.classList.add('bg-amber-500', 'text-emerald-950', 'border-amber-400');
+                    btn.classList.remove('bg-emerald-900');
+                } else {
+                    btn.classList.remove('bg-amber-500', 'text-emerald-950', 'border-amber-400');
+                    btn.classList.add('bg-emerald-900');
+                }
+            });
+
+            // Update Suit buttons style
+            document.querySelectorAll('.suit-btn').forEach(btn => {
+                if (btn.innerText.trim() === selectedSuit) {
+                    btn.classList.add('ring-2', 'ring-amber-400', 'bg-emerald-700');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-amber-400', 'bg-emerald-700');
+                }
+            });
+
+            // Preview button text update & validation
+            const preview = document.getElementById('selected-bid-preview');
+            const submitBtn = document.getElementById('btn-submit-bid');
+
+            if (selectedLevel && selectedSuit) {
+                const proposedBid = `${selectedLevel}${selectedSuit}`;
+                preview.innerText = proposedBid;
+                
+                // Validate if proposed bid is higher than last bid
+                if (isValidBid(selectedLevel, selectedSuit)) {
+                    submitBtn.disabled = false;
+                } else {
+                    preview.innerText = `${proposedBid} (Too Low)`;
+                    submitBtn.disabled = true;
+                }
+            } else {
+                preview.innerText = 'Select Level & Suit';
+                submitBtn.disabled = true;
+            }
+        }
+
+        function getLastBid() {
+            for (let i = state.auction.length - 1; i >= 0; i--) {
+                const call = state.auction[i].call;
+                if (call !== 'Pass' && call !== 'Double' && call !== 'Redouble') {
+                    return state.auction[i];
+                }
+            }
+            return null;
+        }
+
+        function isValidBid(level, suit) {
+            const lastBidObj = getLastBid();
+            if (!lastBidObj) return true;
+
+            const [lastLvlStr, ...suitArr] = lastBidObj.call;
+            const lastLvl = parseInt(lastLvlStr);
+            const lastSuit = suitArr.join('');
+
+            if (level > lastLvl) return true;
+            if (level === lastLvl && SUIT_ORDER[suit] > SUIT_ORDER[lastSuit]) return true;
+
+            return false;
+        }
+
+        function submitBid() {
+            if (!selectedLevel || !selectedSuit) return;
+            makeCall(`${selectedLevel}${selectedSuit}`);
+        }
+
+        function makeCall(callStr) {
+            const currentPlayer = PLAYERS[state.currentTurnIdx];
+            playSound('bid');
+
+            state.auction.push({ player: currentPlayer, call: callStr });
+
+            if (callStr === 'Pass') {
+                state.passesInRow++;
+            } else {
+                state.passesInRow = 0;
+            }
+
+            // Check Auction Completion Condition: 3 consecutive passes after a bid OR 4 initial passes
+            const totalCalls = state.auction.length;
+            const hasAnyBid = state.auction.some(a => a.call !== 'Pass');
+
+            if ((hasAnyBid && state.passesInRow === 3) || (!hasAnyBid && state.passesInRow === 4)) {
+                finalizeAuction();
+                return;
+            }
+
+            // Reset UI selection
+            selectedLevel = null;
+            selectedSuit = null;
+            updateBiddingSelectionVisuals();
+
+            // Next turn
+            state.currentTurnIdx = (state.currentTurnIdx + 1) % 4;
+            updateUI();
+            updateAuctionLog();
+
+            // Trigger AI if next bidder is bot
+            processTurn();
+        }
+
+        function finalizeAuction() {
+            document.getElementById('bidding-modal').classList.add('hidden');
+            document.getElementById('btn-toggle-bidding').classList.add('hidden');
+            const lastBidObj = getLastBid();
+
+            if (!lastBidObj) {
+                // Passed out!
+                alert('All players passed. Dealing a new hand...');
+                startNewDeal();
+                return;
+            }
+
+            // Parse Contract
+            const level = parseInt(lastBidObj.call[0]);
+            const suit = lastBidObj.call.substring(1);
+
+            // Determine Declarer: First player on winning side who bid the contract suit
+            const winningTeam = (lastBidObj.player === 'North' || lastBidObj.player === 'South') ? ['North', 'South'] : ['East', 'West'];
+            let declarer = lastBidObj.player;
+
+            for (let entry of state.auction) {
+                if (winningTeam.includes(entry.player) && entry.call.includes(suit)) {
+                    declarer = entry.player;
+                    break;
+                }
+            }
+
+            const declarerIdx = PLAYERS.indexOf(declarer);
+            const dummy = PLAYERS[(declarerIdx + 2) % 4];
+            const leader = PLAYERS[(declarerIdx + 1) % 4]; // Opening lead is left of declarer
+
+            state.contract = { level, suit, declarer };
+            state.declarer = declarer;
+            state.dummy = dummy;
+            state.phase = 'PLAYING';
+            state.currentTurnIdx = PLAYERS.indexOf(leader);
+
+            updateUI();
+            processTurn();
+        }
+
+        /* ==========================================================================
+           5. TRICK-PLAY PHASE & SUIT FOLLOW RULES
+           ========================================================================== */
+        function playCard(player, cardIndex) {
+            if (state.phase !== 'PLAYING') return;
+
+            // Turn validation
+            const currentTurnPlayer = PLAYERS[state.currentTurnIdx];
+            if (player !== currentTurnPlayer) return;
+
+            const hand = state.hands[player];
+            const card = hand[cardIndex];
+
+            // Enforce Suit-Following Rule
+            if (state.currentTrick.length > 0) {
+                const leadCard = state.currentTrick[0].card;
+                const leadSuit = leadCard.suit;
+
+                if (card.suit !== leadSuit) {
+                    const hasLeadSuit = hand.some(c => c.suit === leadSuit);
+                    if (hasLeadSuit) {
+                        alert(`Rule Enforced: You must follow suit (${leadSuit})!`);
+                        return;
+                    }
+                }
+            } else {
+                state.leadSuit = card.suit;
+            }
+
+            // Remove played card from hand and push to central trick
+            hand.splice(cardIndex, 1);
+            state.currentTrick.push({ player, card });
+            playSound('card');
+
+            updateUI();
+
+            // Check if 4 cards played in trick
+            if (state.currentTrick.length === 4) {
+                setTimeout(resolveTrick, state.aiSpeed * 1.2);
+            } else {
+                state.currentTurnIdx = (state.currentTurnIdx + 1) % 4;
+                updateUI();
+                processTurn();
+            }
+        }
+
+        function resolveTrick() {
+            const leadSuit = state.currentTrick[0].card.suit;
+            const trumpSuit = state.contract.suit;
+
+            let winnerObj = state.currentTrick[0];
+
+            for (let i = 1; i < 4; i++) {
+                const candidate = state.currentTrick[i];
+                
+                if (trumpSuit !== 'NT' && candidate.card.suit === trumpSuit) {
+                    if (winnerObj.card.suit !== trumpSuit || candidate.card.value > winnerObj.card.value) {
+                        winnerObj = candidate;
+                    }
+                } else if (candidate.card.suit === leadSuit && winnerObj.card.suit === leadSuit) {
+                    if (candidate.card.value > winnerObj.card.value) {
+                        winnerObj = candidate;
+                    }
+                }
+            }
+
+            // Assign Trick Point
+            const winner = winnerObj.player;
+            const winningTeam = (winner === 'North' || winner === 'South') ? 'N-S' : 'E-W';
+            state.tricksWon[winningTeam]++;
+
+            // Lead next trick
+            state.currentTurnIdx = PLAYERS.indexOf(winner);
+            state.trickHistory.push({ trick: [...state.currentTrick], winner });
+            state.currentTrick = [];
+            state.leadSuit = null;
+
+            updateUI();
+
+            // Check Hand Completion (13 tricks)
+            if (state.hands['South'].length === 0 && state.hands['North'].length === 0) {
+                finalizeHand();
+            } else {
+                processTurn();
+            }
+        }
+
+        /* ==========================================================================
+           6. AI BOT DECISION ENGINE
+           ========================================================================== */
+        function processTurn() {
+            if (state.phase === 'FINISHED') return;
+
+            const currentTurnPlayer = PLAYERS[state.currentTurnIdx];
+
+            // Check if user is controlling current player turn
+            // User controls South always. If South or North is Declarer, User also controls Dummy when revealed!
+            const isUserControlled = (
+                (currentTurnPlayer === 'South') || 
+                (state.phase === 'PLAYING' && currentTurnPlayer === state.dummy && (state.declarer === 'South' || state.declarer === 'North'))
+            );
+
+            if (!isUserControlled) {
+                setTimeout(() => {
+                    if (state.phase === 'BIDDING') {
+                        aiMakeBid(currentTurnPlayer);
+                    } else if (state.phase === 'PLAYING') {
+                        aiPlayCard(currentTurnPlayer);
+                    }
+                }, state.aiSpeed);
+            }
+        }
+
+        // Basic AI Bidding logic based on High Card Points (HCP)
+        function aiMakeBid(player) {
+            const hand = state.hands[player];
+            
+            // Calculate High Card Points (A=4, K=3, Q=2, J=1)
+            let hcp = 0;
+            hand.forEach(c => {
+                if (c.rank === 'A') hcp += 4;
+                else if (c.rank === 'K') hcp += 3;
+                else if (c.rank === 'Q') hcp += 2;
+                else if (c.rank === 'J') hcp += 1;
+            });
+
+            // Find longest suit
+            const counts = { '♣': 0, '♦': 0, '♥': 0, '♠': 0 };
+            hand.forEach(c => counts[c.suit]++);
+            let bestSuit = '♠';
+            let maxCount = 0;
+            for (let s in counts) {
+                if (counts[s] > maxCount) {
+                    maxCount = counts[s];
+                    bestSuit = s;
+                }
+            }
+
+            const lastBidObj = getLastBid();
+
+            if (!lastBidObj) {
+                // Opening bid logic
+                if (hcp >= 12) {
+                    if (maxCount >= 5) makeCall(`1${bestSuit}`);
+                    else makeCall(`1NT`);
+                } else {
+                    makeCall('Pass');
+                }
+            } else {
+                // Secondary / Overcall logic
+                const lastLvl = parseInt(lastBidObj.call[0]);
+                if (hcp >= 14 && lastLvl < 4) {
+                    const nextLvl = lastLvl + 1;
+                    if (isValidBid(lastLvl, bestSuit)) {
+                        makeCall(`${lastLvl}${bestSuit}`);
+                    } else if (isValidBid(nextLvl, bestSuit)) {
+                        makeCall(`${nextLvl}${bestSuit}`);
+                    } else {
+                        makeCall('Pass');
+                    }
+                } else {
+                    makeCall('Pass');
+                }
+            }
+        }
+
+        // Strategic AI Card Play logic
+        function aiPlayCard(player) {
+            const hand = state.hands[player];
+            if (hand.length === 0) return;
+
+            let validIndices = [];
+
+            // Follow Suit Check
+            if (state.currentTrick.length > 0) {
+                const leadSuit = state.currentTrick[0].card.suit;
+                hand.forEach((c, idx) => {
+                    if (c.suit === leadSuit) validIndices.push(idx);
+                });
+            }
+
+            // If no matching suit, play any card
+            if (validIndices.length === 0) {
+                validIndices = hand.map((_, idx) => idx);
+            }
+
+            // Basic Strategy: Play highest if leading, lowest if following to save high cards
+            let chosenIndex = validIndices[0];
+
+            if (state.currentTrick.length === 0) {
+                // Leading: Play highest card in strongest suit
+                chosenIndex = validIndices.reduce((best, curr) => hand[curr].value > hand[best].value ? curr : best, validIndices[0]);
+            } else {
+                // Following: Play lowest card that follows rules unless winning trick easily
+                chosenIndex = validIndices.reduce((lowest, curr) => hand[curr].value < hand[lowest].value ? curr : lowest, validIndices[0]);
+            }
+
+            playCard(player, chosenIndex);
+        }
+
+        /* ==========================================================================
+           7. SCORING & SUMMARY LOGIC
+           ========================================================================== */
+        function finalizeHand() {
+            state.phase = 'FINISHED';
+            playSound('win');
+
+            const { level, suit, declarer } = state.contract;
+            const declarerTeam = (declarer === 'North' || declarer === 'South') ? 'N-S' : 'E-W';
+            const tricksNeeded = 6 + level;
+            const tricksWon = state.tricksWon[declarerTeam];
+            const diff = tricksWon - tricksNeeded;
+
+            const isMade = diff >= 0;
+
+            // Simplified Bridge Score Calculation
+            let score = 0;
+            if (isMade) {
+                const suitMult = (suit === '♥' || suit === '♠') ? 30 : (suit === 'NT' ? 35 : 20);
+                score = (level * suitMult) + 50 /* Contract bonus */ + (diff * suitMult /* Overtrick bonus */);
+            } else {
+                score = diff * 50; // Penalty points down
+            }
+
+            // Populate Modal UI
+            document.getElementById('summary-contract-desc').innerText = `Contract: ${level}${suit} by ${declarer}`;
+            document.getElementById('summary-ns-tricks').innerText = `${state.tricksWon['N-S']} Tricks`;
+            document.getElementById('summary-ew-tricks').innerText = `${state.tricksWon['E-W']} Tricks`;
+
+            const resText = document.getElementById('summary-result-text');
+            if (isMade) {
+                resText.innerText = diff === 0 ? 'CONTRACT MADE!' : `MADE (+${diff} Overtrick${diff > 1 ? 's' : ''})`;
+                resText.className = 'font-black text-amber-400';
+            } else {
+                resText.innerText = `DEFEATED (${diff} Down)`;
+                resText.className = 'font-black text-red-400';
+            }
+
+            document.getElementById('summary-score-val').innerText = `${score >= 0 ? '+' : ''}${score} pts`;
+            document.getElementById('summary-modal').classList.remove('hidden');
+        }
+
+        /* ==========================================================================
+           8. USER INTERFACE & CARD RENDERING
+           ========================================================================== */
+        function updateUI() {
+            // Update Header Information
+            document.getElementById('header-dealer').innerText = PLAYERS[state.dealerIdx];
+            document.getElementById('header-tricks').innerText = `${state.tricksWon['N-S']} : ${state.tricksWon['E-W']}`;
+
+            if (state.contract) {
+                document.getElementById('header-contract').innerText = `${state.contract.level}${state.contract.suit} (${state.declarer})`;
+            } else {
+                document.getElementById('header-contract').innerText = '--';
+            }
+
+            // Update Current Turn Visual Highlight
+            const currentTurnPlayer = PLAYERS[state.currentTurnIdx];
+            PLAYERS.forEach(p => {
+                const box = document.getElementById(`player-${p.toLowerCase()}-box`);
+                if (box) {
+                    if (p === currentTurnPlayer) {
+                        box.classList.add('active-turn-indicator', 'border-amber-400');
+                    } else {
+                        box.classList.remove('active-turn-indicator', 'border-amber-400');
+                    }
+                }
+            });
+
+            // Update Status Banner Text
+            const banner = document.getElementById('game-status-banner');
+            if (state.phase === 'BIDDING') {
+                banner.innerHTML = `<i class="fa-solid fa-gavel me-1.5 text-amber-400"></i> Bidding Phase: Turn of <strong class="text-amber-300">${currentTurnPlayer}</strong>`;
+            } else if (state.phase === 'PLAYING') {
+                banner.innerHTML = `<i class="fa-solid fa-play me-1.5 text-emerald-400"></i> Trick Play: Turn of <strong class="text-amber-300">${currentTurnPlayer}</strong> ${state.dummy === currentTurnPlayer ? '(Dummy Hand)' : ''}`;
+            }
+
+            // Render Player Cards
+            renderHand('south', state.hands['South'], true);
+            
+            // Dummy hand is visible to everyone during trick play
+            const showNorth = (state.phase === 'PLAYING' && state.dummy === 'North');
+            renderHand('north', state.hands['North'], showNorth);
+
+            const showEast = (state.phase === 'PLAYING' && state.dummy === 'East');
+            renderHand('east', state.hands['East'], showEast);
+
+            const showWest = (state.phase === 'PLAYING' && state.dummy === 'West');
+            renderHand('west', state.hands['West'], showWest);
+
+            // Render Center Played Cards
+            renderTrickArea();
+
+            // Update Trick Counter Badges
+            document.getElementById('tricks-south').innerText = `${state.tricksWon['N-S']} Tricks`;
+            document.getElementById('tricks-north').innerText = `${state.tricksWon['N-S']} Tricks`;
+            document.getElementById('tricks-east').innerText = `${state.tricksWon['E-W']} Tricks`;
+            document.getElementById('tricks-west').innerText = `${state.tricksWon['E-W']} Tricks`;
+        }
+
+        function renderHand(playerKey, cards, faceUp) {
+            const container = document.getElementById(`hand-${playerKey}`);
+            if (!container) return;
+            container.innerHTML = '';
+
+            const player = playerKey.charAt(0).toUpperCase() + playerKey.slice(1);
+            const isTurn = (PLAYERS[state.currentTurnIdx] === player);
+
+            cards.forEach((card, index) => {
+                const cardEl = document.createElement('div');
+                const isRed = card.suit === '♥' || card.suit === '♦';
+
+                if (faceUp) {
+                    cardEl.className = `card w-12 h-18 sm:w-16 sm:h-24 bg-white rounded-lg border border-slate-300 flex flex-col justify-between p-1 select-none ${isTurn ? '' : 'disabled'}`;
+                    cardEl.innerHTML = `
+                        <div class="text-xs font-bold ${isRed ? 'suit-diamonds' : 'suit-spades'} leading-none">
+                            ${card.rank}<br>${card.suit}
+                        </div>
+                        <div class="text-center text-lg sm:text-2xl font-bold ${isRed ? 'suit-diamonds' : 'suit-spades'} leading-none">
+                            ${card.suit}
+                        </div>
+                        <div class="text-xs font-bold ${isRed ? 'suit-diamonds' : 'suit-spades'} leading-none text-right rotate-180">
+                            ${card.rank}<br>${card.suit}
+                        </div>
+                    `;
+
+                    // Click event for playable hands
+                    const canClick = (
+                        (player === 'South' && state.currentTurnIdx === 2) ||
+                        (player === 'North' && state.dummy === 'North' && (state.declarer === 'South' || state.declarer === 'North') && state.currentTurnIdx === 0)
+                    );
+
+                    if (canClick) {
+                        cardEl.onclick = () => playCard(player, index);
+                    }
+                } else {
+                    // Card Back Display
+                    cardEl.className = `card card-back w-10 h-14 sm:w-14 sm:h-20 rounded-lg flex items-center justify-center border border-sky-400/40`;
+                    cardEl.innerHTML = `<i class="fa-solid fa-cards text-sky-400/30 text-xs"></i>`;
+                }
+
+                container.appendChild(cardEl);
+            });
+        }
+
+        function renderTrickArea() {
+            ['north', 'south', 'east', 'west'].forEach(p => {
+                document.getElementById(`trick-${p}`).innerHTML = '';
+            });
+
+            state.currentTrick.forEach(item => {
+                const pKey = item.player.toLowerCase();
+                const slot = document.getElementById(`trick-${pKey}`);
+                const isRed = item.card.suit === '♥' || item.card.suit === '♦';
+
+                if (slot) {
+                    slot.innerHTML = `
+                        <div class="card w-full h-full bg-white rounded-lg border border-slate-300 flex flex-col justify-between p-1.5 shadow-xl animate-fade-in">
+                            <div class="text-xs font-bold ${isRed ? 'suit-diamonds' : 'suit-spades'} leading-none">
+                                ${item.card.rank}<br>${item.card.suit}
+                            </div>
+                            <div class="text-center text-xl font-bold ${isRed ? 'suit-diamonds' : 'suit-spades'}">
+                                ${item.card.suit}
+                            </div>
+                            <div class="text-xs font-bold ${isRed ? 'suit-diamonds' : 'suit-spades'} leading-none text-right rotate-180">
+                                ${item.card.rank}<br>${item.card.suit}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function updateAuctionLog() {
+            const table = document.getElementById('auction-table');
+            table.innerHTML = '';
+
+            state.auction.forEach(entry => {
+                const cell = document.createElement('div');
+                cell.className = 'py-0.5 rounded bg-emerald-900/60 border border-emerald-800 text-amber-200';
+                cell.innerText = entry.call;
+                table.appendChild(cell);
+            });
+
+            document.getElementById('current-bidder-text').innerText = PLAYERS[state.currentTurnIdx];
+        }
+
+        /* ==========================================================================
+           9. HELPERS & CONTROL FUNCTIONS
+           ========================================================================== */
+        function toggleBiddingModal() {
+            if (state.phase !== 'BIDDING') return;
+            const modal = document.getElementById('bidding-modal');
+            const label = document.getElementById('bidding-toggle-label');
+            
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                label.innerText = 'Hide Bidding Box';
+            } else {
+                modal.classList.add('hidden');
+                label.innerText = 'Show Bidding Box';
+            }
+        }
+
+        function toggleSpeed() {
+            if (state.aiSpeed === 800) {
+                state.aiSpeed = 300;
+                document.getElementById('speed-label').innerText = 'Speed: Fast';
+            } else {
+                state.aiSpeed = 800;
+                document.getElementById('speed-label').innerText = 'Speed: Normal';
+            }
+        }
+
+        function getHint() {
+            if (state.phase === 'BIDDING') {
+                alert('Hint (Bidding): Calculate your High Card Points (A=4, K=3, Q=2, J=1). With 12+ points, make an opening bid in your longest suit (5+ cards).');
+            } else if (state.phase === 'PLAYING') {
+                if (state.currentTrick.length === 0) {
+                    alert('Hint (Leading): Lead a high card in a long suit to establish winning tricks for your partnership.');
+                } else {
+                    const leadSuit = state.currentTrick[0].card.suit;
+                    alert(`Hint (Following): You must play a card in ${leadSuit} if you have one. Otherwise, cut with a trump or discard a weak card.`);
+                }
+            }
+        }
+
+        // Initialize on page load
+        window.onload = function() {
+            initGame();
+        };
+    </script>
+</body>
+</html>
